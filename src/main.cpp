@@ -79,15 +79,7 @@ void loadLanguage(Swkbd_LanguageType language)
 	}
 }
 
-int main() {
-   WHBProcInit();
-   WHBLogConsoleInit();
-   int res = romfsInit();
-	if (res) {
-		WHBLogPrintf(">> Failed to init romfs: %d", res);
-		return 0;
-	}
-
+void getSystemLanguage() {
    UCHandle handle = UCOpen();
    if(handle < 1)
    {
@@ -115,7 +107,18 @@ int main() {
    {
       sysLang = Swkbd_LanguageType__English;
    }
+}
 
+int main() {
+   WHBProcInit();
+   WHBLogConsoleInit();
+   int res = romfsInit();
+	if (res) {
+		WHBLogPrintf(">> Failed to init romfs: %d", res);
+		return 0;
+	}
+   
+   getSystemLanguage();
    loadLanguage(sysLang);
    
    WHBLogPrintf(gettext("Hello World!"));
