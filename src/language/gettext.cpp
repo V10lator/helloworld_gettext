@@ -27,14 +27,12 @@
 
 char* strdup (const char* s)
 {
-  size_t slen = strlen(s);
-  char* result = (char *) malloc(slen + 1);
+  size_t slen = strlen(s) + 1;
+  char* result = (char *) malloc(slen);
   if(result == NULL)
-  {
     return NULL;
-  }
 
-  memcpy(result, s, slen+1);
+  memcpy(result, s, slen);
   return result;
 }
 
@@ -43,7 +41,7 @@ typedef struct _MSG {
     char* msgstr;
     struct _MSG *next;
 } MSG;
-static MSG *baseMSG = 0;
+static MSG *baseMSG = NULL;
 
 #define HASHWORDBITS 32
 
@@ -78,9 +76,10 @@ expand_escape(const char *str) {
     if (retval == NULL) return NULL;
     rp = retval;
 
-    while (cp[0] != '\0' && cp[0] != '\\')
+    while (*cp != '\0' && *cp != '\\')
         *rp++ = *cp++;
-    if (cp[0] == '\0') goto terminate;
+
+    if (*cp == '\0') goto terminate;
     do {
 
         /* Here cp[0] == '\\'.  */
@@ -117,10 +116,6 @@ expand_escape(const char *str) {
             *rp++ = '\v';
             ++cp;
             break;
-        case '\\':
-            *rp = '\\';
-            ++cp;
-            break;
         case '0':
         case '1':
         case '2':
@@ -143,14 +138,17 @@ expand_escape(const char *str) {
             *rp = ch;
         }
         break;
+        case '\\':
+            ++cp;
         default:
             *rp = '\\';
             break;
         }
 
-        while (cp[0] != '\0' && cp[0] != '\\')
+        while (*cp != '\0' && *cp != '\\')
             *rp++ = *cp++;
-    } while (cp[0] != '\0');
+
+    } while (*cp != '\0');
 
     /* Terminate string.  */
 terminate:
@@ -158,33 +156,35 @@ terminate:
     return retval;
 }
 
-static MSG *findMSG(uint32_t id) {
-    MSG *msg;
-    for (msg = baseMSG; msg; msg = msg->next) {
-        if (msg->id == id) return msg;
-    }
+static inline MSG *findMSG(uint32_t id) {
+    for (MSG *msg = baseMSG; msg; msg = msg->next)
+        if (msg->id == id)
+            return msg;
+
     return NULL;
 }
 
 static MSG *setMSG(const char *msgid, const char *msgstr) {
+    if(!msgstr)
+        return NULL;
+
     uint32_t id = hash_string(msgid);
     MSG *msg = findMSG(id);
     if (!msg) {
         msg = (MSG *) malloc(sizeof(MSG));
         msg->id = id;
-        msg->msgstr = NULL;
+        msg->msgstr = expand_escape(msgstr);
         msg->next = baseMSG;
         baseMSG = msg;
+        return NULL;
     }
-    if (msg) {
-        if (msgstr) {
-            if (msg->msgstr) free(msg->msgstr);
-            //msg->msgstr = strdup(msgstr);
-            msg->msgstr = expand_escape(msgstr);
-        }
-        return msg;
+
+    if (msgstr) {
+        if (msg->msgstr) free(msg->msgstr);
+        //msg->msgstr = strdup(msgstr);
+        msg->msgstr = expand_escape(msgstr);
     }
-    return NULL;
+    return msg;
 }
 
 extern "C" void gettextCleanUp(void) {
@@ -262,9 +262,10 @@ extern "C" BOOL gettextLoadLanguage(const char* langFile) {
 }
 
 extern "C" const char *gettext(const char *msgid) {
-    if(!msgid) return NULL;
+    if(!msgid)
+        return NULL;
+
     MSG *msg = findMSG(hash_string(msgid));
-    if (msg && msg->msgstr) return msg->msgstr;
-    return msgid;
+    return msg ? msg->msgstr : msgid;
 }
 
